@@ -6,7 +6,7 @@ from typing import List, Optional, Generator, TypedDict, Tuple
 from openai import OpenAI
 from openai.types.chat import ChatCompletionToolParam, ChatCompletionMessageToolCall
 
-from audio_summary_bot_core.youtube_helper import YoutubeHelper
+from audio_summary_bot_core.generic_helper import GenericHelper
 
 PROMPT = """As a professional summarizer, your primary responsibility will be to create an organized summary of a video transcript segmented by topics.
 The transcript provided will include timestamps for each sentence.
@@ -38,16 +38,18 @@ class AiBot:
     ):
         self._data_dir = data_dir
         self._openai_model = openai_model
-        self._yt_helper = YoutubeHelper(
+        self._helper = GenericHelper(
             whisper_model_name=whisper_model_name,
             device=whisper_device,
             data_dir=data_dir
         )
         self._openai = OpenAI(api_key=openai_api_key)
 
-    def summarize_youtube_video(self, youtube_video_url: str) -> Generator[TopicSummary, None, None]:
-        video_id = self._yt_helper.get_video_id(video_url=youtube_video_url)
-        full_transcript = self.transcript_youtube_video(youtube_video_url=youtube_video_url)
+    def summarize_video(self, video_url: str) -> Generator[TopicSummary, None, None]:
+        if not self.validate_video_url(video_url):
+            raise ValueError("Invalid video URL")
+        video_id = self._helper.get_video_id(video_url)
+        full_transcript = self.transcript_video(video_url)
         messages = [
             {
                 "role": "system",
@@ -114,24 +116,20 @@ class AiBot:
                 fn_args['ref_url'] = f'https://youtu.be/{video_id}?t={sec}s'
                 yield fn_args
 
-    def _get_youtube_video_id(self, youtube_video_url: str) -> str:
-        video_id = re.search(r"v=([^&]+)", youtube_video_url).group(1)
-        return video_id
-
-    def transcript_youtube_video(self, youtube_video_url: str) -> str:
-        video_id = self._yt_helper.get_video_id(video_url=youtube_video_url)
+    def transcript_video(self, video_url: str) -> str:
+        video_id = self._helper.get_video_id(video_url)
         audio_file = self._data_dir / f'{video_id}.webm'
         data_file = self._data_dir / f'{video_id}.json'
 
         if not audio_file.exists():
-            audio_content = self._yt_helper.video2audio(youtube_video_url)
+            audio_content = self._helper.video2audio(video_url)
             with audio_file.open('wb') as f:
                 f.write(audio_content)
         else:
             with audio_file.open('rb') as f:
                 audio_content = f.read()
         if not data_file.exists():
-            transcript = self._yt_helper.audio2text(audio_content)
+            transcript = self._helper.audio2text(audio_content)
             with data_file.open('w') as f:
                 f.write(json.dumps(transcript))
         else:
@@ -142,4 +140,4 @@ class AiBot:
         return full_transcript
 
     def validate_video_url(self, video_url: str) -> bool:
-        return self._yt_helper.get_video_id(video_url=video_url) is not None
+        return self._helper.check_if_supported(video_url)

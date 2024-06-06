@@ -94,7 +94,7 @@ class TelegramBot:
             await message.reply("url not supported")
             return
         reply_message = await message.reply("processing ... please wait")
-        summary = self._ai.summarize_youtube_video(message_text)
+        summary = self._ai.summarize_video(message_text)
         topic_id = 0
         for d in summary:
             if topic_id == 0:
