@@ -1,0 +1,12 @@
+python-dotenv
+
+# audio_summary_bot_core
+yt-dlp==2024.3.10
+openai-whisper==20231117
+pydub==0.25.1
+
+# audio_summary_simple_bot
+openai
+
+# telegram bot
+aiogram==3.4.1
