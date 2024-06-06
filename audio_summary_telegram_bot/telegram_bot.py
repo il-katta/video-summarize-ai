@@ -87,16 +87,20 @@ class TelegramBot:
 
     async def _on_message(self, message: types.Message) -> None:
         if message.content_type != enums.ContentType.TEXT:
+            await message.reply("not supported")
             return
         message_text = message.text
         if not self._ai.validate_video_url(message_text):
+            await message.reply("url not supported")
             return
         reply_message = await message.reply("processing ... please wait")
         summary = self._ai.summarize_youtube_video(message_text)
-        await self.edit_message_text_async("Process complete",
-                                           chat_id=reply_message.chat.id, message_id=reply_message.message_id)
         topic_id = 0
         for d in summary:
+            if topic_id == 0:
+                await self.edit_message_text_async("Process complete",
+                                                   chat_id=reply_message.chat.id,
+                                                   message_id=reply_message.message_id)
             topic_id += 1
             title = self._.bold(f"{topic_id} - {d['topic']}")
             response_text = self._.link(title, d['ref_url'])
@@ -113,4 +117,6 @@ class TelegramBot:
         return await self._bot.send_message(chat_id,
                                             text,
                                             reply_to_message_id=reply_to_message_id,
-                                            parse_mode=enums.ParseMode.HTML)
+                                            link_preview_options=types.LinkPreviewOptions(is_disabled=True),
+                                            parse_mode=enums.ParseMode.HTML
+                                            )
