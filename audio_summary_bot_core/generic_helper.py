@@ -72,5 +72,3 @@ class GenericHelper(BaseHelper):
             return info.get('id')
         except yt_dlp.DownloadError:
             return None
-
-
