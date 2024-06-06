@@ -1,4 +1,5 @@
 import asyncio
+import datetime
 import re
 from pathlib import Path
 from typing import Optional
@@ -103,9 +104,14 @@ class TelegramBot:
                                                    message_id=reply_message.message_id)
             topic_id += 1
             title = self._.bold(f"{topic_id} - {d['topic']}")
-            response_text = self._.link(title, d['ref_url'])
+            if d['ref_url']:
+                response_text = self._.link(title, d['ref_url'])
+            else:
+                response_text = title
             response_text += self._.blockquote(d['summary'])
-            response_text += self._.link(d['ref_url'], d['ref_url'])
+            if d['ref_url']:
+                response_text += self._.link(d['ref_url'], d['ref_url'])
+            response_text += self._.italic(f"{datetime.timedelta(seconds=int(d['timestamp'][0]))} - {datetime.timedelta(seconds=int(d['timestamp'][1]))}")
             await self.send_message_async(chat_id=reply_message.chat.id, text=response_text)
 
     cmd_start.filters = [filters.CommandStart()]

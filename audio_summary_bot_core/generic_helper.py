@@ -4,14 +4,11 @@ from typing import Optional
 
 import yt_dlp
 
+
 from audio_summary_bot_core.base_helper import BaseHelper
 
 
-def _check_if_supported(url: str) -> bool:
-    for ie in yt_dlp.list_extractors():
-        if ie.suitable(url):
-            return True
-    return False
+
 
 
 class GenericHelper(BaseHelper):
@@ -57,14 +54,25 @@ class GenericHelper(BaseHelper):
         audio_content = self.video2audio(video_url)
         return self.audio2text(audio_content)
 
+    @staticmethod
+    def _check_if_supported( url: str) -> bool:
+        for ie in yt_dlp.list_extractors():
+            if ie.suitable(url):
+                return True
+        return False
+
     def check_if_supported(self, url: str) -> bool:
-        if not _check_if_supported(url):
+        if not self._check_if_supported(url):
             return False
         try:
             info = self._yt.extract_info(url, download=False)
             return bool(info.get('extractor'))
         except yt_dlp.DownloadError:
             return False
+
+    def is_youtube_video(self, url: str) -> bool:
+        import yt_dlp.extractor.youtube
+        return yt_dlp.extractor.youtube.YoutubeIE().suitable(url)
 
     def get_video_id(self, url: str) -> Optional[str]:
         try:

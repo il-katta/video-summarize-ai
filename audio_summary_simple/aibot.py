@@ -49,6 +49,7 @@ class AiBot:
         if not self.validate_video_url(video_url):
             raise ValueError("Invalid video URL")
         video_id = self._helper.get_video_id(video_url)
+        is_yt = self._helper.is_youtube_video(video_url)
         full_transcript = self.transcript_video(video_url)
         messages = [
             {
@@ -113,7 +114,10 @@ class AiBot:
                 fn_args = json.loads(tool_call.function.arguments)
                 fn_args['timestamp'] = tuple(fn_args['timestamp'])
                 sec = int(fn_args['timestamp'][0])
-                fn_args['ref_url'] = f'https://youtu.be/{video_id}?t={sec}s'
+                if is_yt:
+                    fn_args['ref_url'] = f'https://youtu.be/{video_id}?t={sec}s'
+                else:
+                    fn_args['ref_url'] = None
                 yield fn_args
 
     def transcript_video(self, video_url: str) -> str:
