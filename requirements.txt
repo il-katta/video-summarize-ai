@@ -1,6 +1,6 @@
 python-dotenv
 
-# audio_summary_bot_core
+# video_summary_bot_core
 yt-dlp==2024.3.10
 openai-whisper==20231117
 pydub==0.25.1

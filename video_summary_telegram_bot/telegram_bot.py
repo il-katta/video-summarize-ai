@@ -1,11 +1,9 @@
 import asyncio
-import datetime
-import re
+import logging
 from pathlib import Path
 from typing import Optional
 
 from aiogram import Bot, Dispatcher
-from aiogram import Router
 from aiogram import enums
 from aiogram import filters
 from aiogram import types
@@ -13,13 +11,8 @@ from aiogram.client.session.aiohttp import AiohttpSession
 from aiogram.client.telegram import TelegramAPIServer
 from aiogram.fsm.storage.memory import SimpleEventIsolation
 from aiogram.utils.text_decorations import HtmlDecoration
-
-from audio_summary_simple.aibot import AiBot
-
-
-class AllCommands(filters.Command):
-    def __init__(self):
-        super().__init__(re.compile(r".*"))
+from video_summary_simple.aibot import AiBot
+from video_summary_telegram_bot.handlers.on_message_handler import OnMessageHandler
 
 
 class TelegramBot:
@@ -27,6 +20,7 @@ class TelegramBot:
     def __init__(
             self,
             token: str,
+            summary_language: Optional[str] = None,
             telegram_bot_api_server: Optional[str] = None,
             openai_model: str = "gtp-4o",
             openai_api_key: Optional[str] = None,
@@ -45,8 +39,8 @@ class TelegramBot:
         self._bot = Bot(token=token, parse_mode=enums.ParseMode.HTML, session=session)
         self._ = HtmlDecoration()
         self._loop = asyncio.get_event_loop()
-        self._router = Router()
         self._ai = AiBot(
+            language=summary_language,
             openai_model=openai_model,
             openai_api_key=openai_api_key,
             whisper_model_name=whisper_model_name,
@@ -55,6 +49,7 @@ class TelegramBot:
         )
 
     async def start_async(self) -> None:
+        logging.info("starting bot")
         await self._register_handlers()
         await self._bot.delete_webhook()
         await self._dp.start_polling(self._bot)
@@ -66,53 +61,32 @@ class TelegramBot:
     async def _register_handlers(self) -> None:
         commands: list[types.BotCommand] = []
         for method_name in dir(self):
+            # register all command methods
             if method_name.startswith("cmd_"):
                 method = getattr(self, method_name)
                 commands.append(types.BotCommand(command=method_name[4:], description=method.__doc__))
                 if hasattr(method, "filters"):
-                    _filters = method.filters
+                    self._dp.message.register(method, *method.filters)
                 else:
-                    _filters = []
-                self._dp.message.register(method, *_filters)
+                    self._dp.message.register(method)
+
+            # register all action methods
             if method_name.startswith("action_"):
                 method = getattr(self, method_name)
                 self._dp.callback_query.register(method, method.callback_query)
-        self._router.message.register(self._on_message, ~AllCommands())
-        self._dp.include_routers(self._router)
+
+        # default message handler
+        handler = OnMessageHandler(self)
+        self._dp.message.register(handler.on_message, *handler.filters)
+
+        # refresh commands list
         await self._bot.delete_my_commands()
         await self._bot.set_my_commands(commands)
 
     async def cmd_start(self, message: types.Message) -> None:
         """Start command"""
+        logging.info(f"received a start command from {message.from_user.id}")
         await message.reply("hello")
-
-    async def _on_message(self, message: types.Message) -> None:
-        if message.content_type != enums.ContentType.TEXT:
-            await message.reply("not supported")
-            return
-        message_text = message.text
-        if not self._ai.validate_video_url(message_text):
-            await message.reply("url not supported")
-            return
-        reply_message = await message.reply("processing ... please wait")
-        summary = self._ai.summarize_video(message_text)
-        topic_id = 0
-        for d in summary:
-            if topic_id == 0:
-                await self.edit_message_text_async("Process complete",
-                                                   chat_id=reply_message.chat.id,
-                                                   message_id=reply_message.message_id)
-            topic_id += 1
-            title = self._.bold(f"{topic_id} - {d['topic']}")
-            if d['ref_url']:
-                response_text = self._.link(title, d['ref_url'])
-            else:
-                response_text = title
-            response_text += self._.blockquote(d['summary'])
-            if d['ref_url']:
-                response_text += self._.link(d['ref_url'], d['ref_url'])
-            response_text += self._.italic(f"{datetime.timedelta(seconds=int(d['timestamp'][0]))} - {datetime.timedelta(seconds=int(d['timestamp'][1]))}")
-            await self.send_message_async(chat_id=reply_message.chat.id, text=response_text)
 
     cmd_start.filters = [filters.CommandStart()]
 
@@ -126,3 +100,7 @@ class TelegramBot:
                                             link_preview_options=types.LinkPreviewOptions(is_disabled=True),
                                             parse_mode=enums.ParseMode.HTML
                                             )
+
+    @property
+    def ai(self) -> AiBot:
+        return self._ai

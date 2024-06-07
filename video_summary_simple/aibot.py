@@ -1,4 +1,5 @@
 import json
+import logging
 import re
 from pathlib import Path
 from typing import List, Optional, Generator, TypedDict, Tuple
@@ -6,7 +7,7 @@ from typing import List, Optional, Generator, TypedDict, Tuple
 from openai import OpenAI
 from openai.types.chat import ChatCompletionToolParam, ChatCompletionMessageToolCall
 
-from audio_summary_bot_core.generic_helper import GenericHelper
+from video_summary_bot_core.generic_helper import GenericHelper
 
 PROMPT = """As a professional summarizer, your primary responsibility will be to create an organized summary of a video transcript segmented by topics.
 The transcript provided will include timestamps for each sentence.
@@ -30,12 +31,14 @@ class AiBot:
 
     def __init__(
             self,
+            language: Optional[str] = None,
             openai_model: str = "gtp-4o",
             openai_api_key: Optional[str] = None,
             whisper_model_name: str = "large-v3",
             whisper_device: str = "cuda",
             data_dir: str | Path = "data"
     ):
+        self._language = language
         self._data_dir = data_dir
         self._openai_model = openai_model
         self._helper = GenericHelper(
@@ -48,13 +51,17 @@ class AiBot:
     def summarize_video(self, video_url: str) -> Generator[TopicSummary, None, None]:
         if not self.validate_video_url(video_url):
             raise ValueError("Invalid video URL")
-        video_id = self._helper.get_video_id(video_url)
-        is_yt = self._helper.is_youtube_video(video_url)
         full_transcript = self.transcript_video(video_url)
+        for s in self.generate_summary(video_url, full_transcript):
+            yield s
+
+    def generate_summary(self, video_url: str, full_transcript: str) -> Generator[TopicSummary, None, None]:
+        is_yt = self._helper.is_youtube_video(video_url)
+        video_id = self._helper.get_video_id(video_url)
         messages = [
             {
                 "role": "system",
-                "content": PROMPT,
+                "content": self.get_system_prompt(),
             },
             {
                 "role": "system",
@@ -110,6 +117,8 @@ class AiBot:
             for tool_call in tool_calls:
                 fn_name = tool_call.function.name
                 if fn_name not in functions.keys():
+                    logging.error(
+                        f"function '{fn_name}' not found in openai tools definitions. Skipping. (args: {tool_call.function.arguments})")
                     raise AttributeError(f"function '{fn_name}' not found in openai tools definitions")
                 fn_args = json.loads(tool_call.function.arguments)
                 fn_args['timestamp'] = tuple(fn_args['timestamp'])
@@ -121,27 +130,46 @@ class AiBot:
                 yield fn_args
 
     def transcript_video(self, video_url: str) -> str:
-        video_id = self._helper.get_video_id(video_url)
-        audio_file = self._data_dir / f'{video_id}.webm'
-        data_file = self._data_dir / f'{video_id}.json'
+        video_info = self._helper.get_video_info(video_url)
+        video_id = video_info.get('id')
+        extractor = video_info.get('extractor')
+        audio_file = self._data_dir / f'{extractor}_{video_id}.webm'
+        data_file = self._data_dir / f'{extractor}_{video_id}.json'
 
         if not audio_file.exists():
+            # download audio
             audio_content = self._helper.video2audio(video_url)
             with audio_file.open('wb') as f:
                 f.write(audio_content)
         else:
+            # read audio from cache
             with audio_file.open('rb') as f:
                 audio_content = f.read()
         if not data_file.exists():
+            # transcribe audio
             transcript = self._helper.audio2text(audio_content)
             with data_file.open('w') as f:
                 f.write(json.dumps(transcript))
         else:
+            # read transcript from cache
             with data_file.open('r') as f:
                 transcript = json.loads(f.read())
 
-        full_transcript = "\n".join([f"[{s['start']} --> {s['end']}] {s['text']}" for s in transcript])
-        return full_transcript
+        return self._transcript_to_text(transcript)
+
+    def transcript_video_no_cache(self, video_url: str) -> str:
+        audio_content = self._helper.video2audio(video_url)
+        transcript = self._helper.audio2text(audio_content)
+        return self._transcript_to_text(transcript)
+
+    def _transcript_to_text(self, transcript: List[dict]) -> str:
+        return "\n".join([f"[{s['start']} --> {s['end']}] {s['text']}" for s in transcript])
 
     def validate_video_url(self, video_url: str) -> bool:
         return self._helper.check_if_supported(video_url)
+
+    def get_system_prompt(self) -> str:
+        prompt = PROMPT
+        if self._language:
+            prompt = f"{prompt}\nIt is very important that every summary and topic title must be written in {self._language}"
+        return prompt

@@ -28,8 +28,8 @@ setup(
     packages=find_packages(),
     entry_points={
         'console_scripts': [
-            'audio_summary_simple = audio_summary_simple.__main__:main',
-            'audio_summary_telegram_bot = audio_summary_telegram_bot.__main__:main',
+            'video_summary_simple = video_summary_simple.__main__:main',
+            'video_summary_telegram_bot = video_summary_telegram_bot.__main__:main',
         ]
     }
 )

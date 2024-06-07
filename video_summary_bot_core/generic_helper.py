@@ -4,11 +4,7 @@ from typing import Optional
 
 import yt_dlp
 
-
-from audio_summary_bot_core.base_helper import BaseHelper
-
-
-
+from video_summary_bot_core.base_helper import BaseHelper
 
 
 class GenericHelper(BaseHelper):
@@ -55,7 +51,7 @@ class GenericHelper(BaseHelper):
         return self.audio2text(audio_content)
 
     @staticmethod
-    def _check_if_supported( url: str) -> bool:
+    def _check_if_supported(url: str) -> bool:
         for ie in yt_dlp.list_extractors():
             if ie.suitable(url):
                 return True
@@ -75,8 +71,11 @@ class GenericHelper(BaseHelper):
         return yt_dlp.extractor.youtube.YoutubeIE().suitable(url)
 
     def get_video_id(self, url: str) -> Optional[str]:
+        info = self.get_video_info(url)
+        return info.get('id', None)
+
+    def get_video_info(self, url: str) -> dict:
         try:
-            info = self._yt.extract_info(url, download=False)
-            return info.get('id')
+            return self._yt.extract_info(url, download=False)
         except yt_dlp.DownloadError:
-            return None
+            return {}

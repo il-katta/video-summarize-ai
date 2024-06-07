@@ -6,7 +6,7 @@ from typing import Tuple, List
 
 from openai.types.chat import ChatCompletionToolParam, ChatCompletionMessageToolCall
 
-from audio_summary_bot_core.youtube_helper import YoutubeHelper
+from video_summary_bot_core.youtube_helper import YoutubeHelper
 
 PROMPT = """As a professional summarizer, your primary responsibility will be to create an organized summary of a video transcript segmented by topics.
 The transcript provided will include timestamps for each sentence.

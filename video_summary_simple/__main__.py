@@ -2,7 +2,7 @@ import argparse
 import os
 from pathlib import Path
 
-from audio_summary_simple.aibot import AiBot
+from video_summary_simple.aibot import AiBot
 
 
 def main():

@@ -22,4 +22,4 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     pip install -e /src/app
 
 
-ENTRYPOINT ["audio_summary_telegram_bot"]
+ENTRYPOINT ["video_summary_telegram_bot"]
