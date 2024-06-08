@@ -20,6 +20,11 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}  # to check out the actual pull request commit, not the merge commit
           fetch-depth: 0  # a full history is required for pull request analysis
+      - name: 'Install dependencies'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends python3 python3-pip python3-dev ffmpeg
+          pip install .
       - name: 'Qodana Scan'
         uses: JetBrains/qodana-action@v2024.1
         env:

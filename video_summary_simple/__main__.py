@@ -16,15 +16,15 @@ def main():
     youtube_video_url = args.video_url
     data_dir: Path = args.data_dir
     data_dir.mkdir(exist_ok=True, parents=True)
-    OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', args.openai_api_key)
+    openai_api_key = os.environ.get('OPENAI_API_KEY', args.openai_api_key)
     ai = AiBot(
         data_dir=data_dir,
         openai_model=args.openai_model,
         whisper_model_name=args.whisper_model,
-        openai_api_key=OPENAI_API_KEY
+        openai_api_key=openai_api_key
     )
 
-    for d in ai.summarize_youtube_video(youtube_video_url):
+    for d in ai.summarize_video(youtube_video_url):
         print("")
         print(f"# {d['topic']}")
         print("")
